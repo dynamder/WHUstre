@@ -4,14 +4,6 @@ import cytoscape from "cytoscape";
 // 跨边界只有四种数据：全图 JSON（init 一次）、状态 JSON（每次更新）、
 // 概念 id、键盘按键。
 
-const ROW_GAP = 64;
-const COL_GAP = 210;
-// 一簇超过这么多节点就折到右边一列：98 个节点排成一条竖条时，
-// 全览的缩放只有 0.3 上下，图会退化成一条线。
-const MAX_ROWS = 14;
-// 同一重心上常落着多条超边（五个安全对象既属于「五类威胁」又属于「5×5 矩阵」），
-// 按黄金角把它们散开，避免两个菱形完全重叠。
-const HYPEREDGE_MIN_GAP = 46;
 const LABEL_ZOOM = 0.75;
 
 const CLUSTER_COLORS = {
@@ -148,83 +140,281 @@ function style_for(theme) {
         "text-opacity": 1,
       },
     },
+    {
+      // 簇框：淡色底 + 虚线边 + 簇名。它承担「聚类」这件事，
+      // 但只做背景，别和节点抢注意力。
+      selector: ":parent",
+      style: {
+        shape: "round-rectangle",
+        "background-color": "data(color)",
+        "background-opacity": 0.045,
+        "border-width": 1,
+        "border-style": "dashed",
+        "border-color": "data(color)",
+        "border-opacity": 0.3,
+        label: "data(label)",
+        "font-size": 11,
+        "font-weight": 600,
+        "text-valign": "top",
+        "text-halign": "center",
+        "text-margin-y": -6,
+        color: "data(color)",
+        "text-outline-width": 2,
+        "text-outline-color": theme.surface,
+        padding: 26,
+      },
+    },
   ];
 }
 
-// 布局是确定性的：一簇一段列，簇内按数据顺序排；超边落在其成员的重心附近。
-// 图是索引，不是展示品，所以不用力导向布局的随机形状。
-function build_elements(graph) {
-  const by_cluster = new Map();
-  for (const concept of graph.concepts) {
-    const items = by_cluster.get(concept.cluster) ?? [];
-    items.push(concept);
-    by_cluster.set(concept.cluster, items);
-  }
+// 布局 -------------------------------------------------------------------
+//
+// 布局自己算：这张图要同时满足三件事——六簇各自成团、强关系近弱关系远、
+// 每次打开形状一致。现成的力导向插件在两点上不合用：fCoSE/cose 的增量模式
+// 会把初值（列网格）原样保留下来，随机模式又每次不同；compound 父节点在
+// 这张图上会把整体撑到一万多像素。所以这里用一个确定性的小模拟：
+// 哈希云做初值，成对斥力 + 按关系类型定长的弹簧 + 簇锚点牵引，迭代固定次数。
 
-  const positions = new Map();
-  let column = 0;
-  for (const cluster of graph.clusters) {
-    const items = by_cluster.get(cluster.id) ?? [];
-    by_cluster.delete(cluster.id);
-    for (let start = 0; start < items.length; start += MAX_ROWS) {
-      const slice = items.slice(start, start + MAX_ROWS);
-      slice.forEach((concept, row) => {
-        positions.set(concept.id, { x: column * COL_GAP, y: row * ROW_GAP });
-      });
-      column += 1;
-    }
-  }
-  // clusters 里没登记到的簇也要有位置，不能让节点掉在 (0,0)。
-  for (const items of by_cluster.values()) {
-    items.forEach((concept, row) => {
-      positions.set(concept.id, { x: column * COL_GAP, y: row * ROW_GAP });
+const ITERATIONS = 520;
+const REPULSION = 950;
+const ANCHOR_PULL = 0.032;
+const STEP_LIMIT = 26;
+const SEED_RX = 440;
+const SEED_RY = 280;
+
+// 关系越强，弹簧越硬、静止长度越短。对照关系故意放到 165 且很松：
+// 「同一组对象的两个视角」在图上应当明显比「某概念是某概念的一部分」远。
+const SPRING = {
+  组成: { rest: 58, stiffness: 0.07 },
+  上位: { rest: 58, stiffness: 0.07 },
+  依赖: { rest: 62, stiffness: 0.06 },
+  细化: { rest: 62, stiffness: 0.06 },
+  度量: { rest: 78, stiffness: 0.04 },
+  对照: { rest: 165, stiffness: 0.012 },
+  矩阵: { rest: 95, stiffness: 0.03 },
+  选型: { rest: 95, stiffness: 0.03 },
+  映射: { rest: 82, stiffness: 0.04 },
+  流程: { rest: 90, stiffness: 0.035 },
+  演进: { rest: 82, stiffness: 0.04 },
+  超边: { rest: 92, stiffness: 0.03 },
+};
+
+// splitmix32 的简化版：给定整数，稳定地吐出一个 [0,1) 小数。
+// 用它代替 Math.random，同一个节点每次都在同一处出发。
+function hash_unit(seed) {
+  let value = seed | 0;
+  value = (value + 0x9e3779b9) | 0;
+  let t = value ^ (value >>> 16);
+  t = Math.imul(t, 0x21f0aaad);
+  t ^= t >>> 15;
+  t = Math.imul(t, 0x735a2d97);
+  t ^= t >>> 15;
+  return (t >>> 0) / 4294967296;
+}
+
+function seed_anchors(graph) {
+  const anchors = new Map();
+  const total = Math.max(graph.clusters.length, 1);
+  graph.clusters.forEach((cluster, index) => {
+    const angle = -Math.PI / 2 + (index * 2 * Math.PI) / total;
+    anchors.set(cluster.id, {
+      x: Math.cos(angle) * SEED_RX,
+      y: Math.sin(angle) * SEED_RY,
     });
-    column += 1;
+  });
+  return anchors;
+}
+
+function relax(positions, links, anchors, cluster_of) {
+  const ids = [...positions.keys()];
+  const pos = new Map(
+    ids.map((id) => [id, { x: positions.get(id).x, y: positions.get(id).y }]),
+  );
+  const disp = new Map(ids.map((id) => [id, { x: 0, y: 0 }]));
+  const plus = (map, id, x, y) => {
+    const slot = map.get(id);
+    slot.x += x;
+    slot.y += y;
+  };
+
+  for (let step = 0; step < ITERATIONS; step += 1) {
+    const alpha = 1 - step / ITERATIONS;
+    for (const id of ids) {
+      const slot = disp.get(id);
+      slot.x = 0;
+      slot.y = 0;
+    }
+
+    for (let i = 0; i < ids.length; i += 1) {
+      const a = pos.get(ids[i]);
+      for (let j = i + 1; j < ids.length; j += 1) {
+        const b = pos.get(ids[j]);
+        let dx = a.x - b.x;
+        let dy = a.y - b.y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 1) {
+          dx = 0.5 + hash_unit(i * 7 + j);
+          dy = 0.5 + hash_unit(j * 7 + i);
+          d2 = dx * dx + dy * dy;
+        }
+        const d = Math.sqrt(d2);
+        const push = REPULSION / d2;
+        const fx = (dx / d) * push;
+        const fy = (dy / d) * push;
+        plus(disp, ids[i], fx, fy);
+        plus(disp, ids[j], -fx, -fy);
+      }
+    }
+
+    for (const link of links) {
+      const a = pos.get(link.a);
+      const b = pos.get(link.b);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.hypot(dx, dy) || 0.001;
+      const pull = (d - link.rest) * link.stiffness;
+      const fx = (dx / d) * pull;
+      const fy = (dy / d) * pull;
+      plus(disp, link.a, fx, fy);
+      plus(disp, link.b, -fx, -fy);
+    }
+
+    for (const id of ids) {
+      const anchor = anchors.get(cluster_of.get(id));
+      if (!anchor) continue;
+      const p = pos.get(id);
+      plus(disp, id, (anchor.x - p.x) * ANCHOR_PULL, (anchor.y - p.y) * ANCHOR_PULL);
+    }
+
+    for (const id of ids) {
+      const p = pos.get(id);
+      const d = disp.get(id);
+      const length = Math.hypot(d.x, d.y);
+      const cap = STEP_LIMIT * alpha + 1.5;
+      const scale = length > cap ? cap / length : 1;
+      p.x += d.x * scale;
+      p.y += d.y * scale;
+    }
   }
 
-  const elements = graph.concepts.map((concept) => ({
-    data: {
-      id: concept.id,
-      kind: "concept",
-      name: concept.name,
-      cluster: concept.cluster,
-      tested: concept.tested,
-      color: CLUSTER_COLORS[concept.cluster] ?? "#6b7280",
-    },
-    position: positions.get(concept.id),
-  }));
+  return pos;
+}
 
-  const placed = [];
-  const place_hyperedge = (center) => {
-    let angle = -0.7;
-    let radius = 54;
-    for (let attempt = 0; attempt < 60; attempt += 1) {
-      const candidate = {
-        x: center.x + Math.cos(angle) * radius,
-        y: center.y + Math.sin(angle) * radius,
-      };
-      const free = placed.every(
-        (point) =>
-          Math.hypot(point.x - candidate.x, point.y - candidate.y) >
-          HYPEREDGE_MIN_GAP,
-      );
-      if (free) {
-        placed.push(candidate);
-        return candidate;
-      }
-      angle += 2.399963229728653; // 黄金角
-      if (attempt % 3 === 2) radius += 22;
+// 超边的菱形找不到不压节点的位置时，就放在成员重心上——宁可压一次，
+// 也不要把它甩到一个没有关系指向的地方。
+function place_diamond(center, nodes, placed) {
+  let angle = -0.7;
+  let radius = 34;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    const candidate = {
+      x: center.x + Math.cos(angle) * radius,
+      y: center.y + Math.sin(angle) * radius,
+    };
+    const clear_of_nodes = nodes.every(
+      (point) => Math.hypot(point.x - candidate.x, point.y - candidate.y) > 30,
+    );
+    const clear_of_diamonds = placed.every(
+      (point) => Math.hypot(point.x - candidate.x, point.y - candidate.y) > 42,
+    );
+    if (clear_of_nodes && clear_of_diamonds) {
+      placed.push(candidate);
+      return candidate;
     }
-    placed.push(center);
-    return center;
-  };
+    angle += 2.399963229728653;
+    if (attempt % 4 === 3) radius += 18;
+  }
+  placed.push(center);
+  return center;
+}
+
+export function build_elements(graph) {
+  const anchors = seed_anchors(graph);
+  const seeds = new Map();
+  const cluster_of = new Map();
+  const rows = new Map();
+
+  for (const concept of graph.concepts) {
+    const anchor = anchors.get(concept.cluster) ?? { x: 0, y: 0 };
+    const index = rows.get(concept.cluster) ?? 0;
+    rows.set(concept.cluster, index + 1);
+    // 初值必须是「云」而不是网格：从网格出发，迭代后会保留网格的痕迹。
+    const angle = hash_unit(index * 2 + 1) * 2 * Math.PI;
+    const radius = 30 + hash_unit(index * 2 + 2) * 210;
+    seeds.set(concept.id, {
+      x: anchor.x + Math.cos(angle) * radius,
+      y: anchor.y + Math.sin(angle) * radius,
+    });
+    cluster_of.set(concept.id, concept.cluster);
+  }
+
+  const links = [];
+  for (const edge of graph.hyperedges) {
+    const members = [
+      ...new Set([...(edge.members ?? []), edge.result].filter(Boolean)),
+    ];
+    const spring = SPRING[edge.kind] ?? SPRING.超边;
+    if (edge.binary && members.length === 2) {
+      links.push({ a: members[0], b: members[1], ...spring });
+      continue;
+    }
+    // 超边没有菱形节点参与布局：成员之间用「超边」这一档的弹簧互相牵引，
+    // 菱形稍后落在成员重心旁边。
+    for (let i = 0; i < members.length; i += 1) {
+      for (let j = i + 1; j < members.length; j += 1) {
+        links.push({ a: members[i], b: members[j], ...SPRING.超边 });
+      }
+    }
+  }
+
+  const positions = relax(seeds, links, anchors, cluster_of);
+
+  const elements = [];
+
+  // 簇框：parent 只负责把同簇节点框在一起，位置仍由上面的模拟决定。
+  // 用 compound 而不是画装饰矩形，是因为折叠、ego 与打印都要跟着它走。
+  for (const cluster of graph.clusters) {
+    const members = graph.concepts.filter((concept) => concept.cluster === cluster.id);
+    const points = members.map((concept) => positions.get(concept.id)).filter(Boolean);
+    const center = points.length
+      ? {
+          x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+          y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
+        }
+      : anchors.get(cluster.id) ?? { x: 0, y: 0 };
+    elements.push({
+      data: {
+        id: `cluster:${cluster.id}`,
+        kind: "cluster",
+        label: cluster.label,
+        color: CLUSTER_COLORS[cluster.id] ?? "#6b7280",
+      },
+      position: center,
+    });
+  }
+
+  for (const concept of graph.concepts) {
+    elements.push({
+      data: {
+        id: concept.id,
+        kind: "concept",
+        name: concept.name,
+        cluster: concept.cluster,
+        parent: `cluster:${concept.cluster}`,
+        tested: concept.tested,
+        color: CLUSTER_COLORS[concept.cluster] ?? "#6b7280",
+      },
+      position: positions.get(concept.id),
+    });
+  }
+
+  const node_points = [...positions.values()];
+  const placed = [];
 
   for (const hyperedge of graph.hyperedges) {
     const members = [
       ...new Set([...(hyperedge.members ?? []), hyperedge.result].filter(Boolean)),
     ];
 
-    // 二元边画成一条线：六类二元关系有六十多条，每条都配一个菱形节点会盖住节点。
     if (hyperedge.binary && members.length === 2) {
       elements.push({
         data: {
@@ -232,21 +422,20 @@ function build_elements(graph) {
           source: members[0],
           target: members[1],
           binary: 1,
+          kind: hyperedge.kind,
         },
       });
       continue;
     }
-    const points = members
-      .map((id) => positions.get(id))
-      .filter((point) => point !== undefined);
-    const center = points.length
+
+    const points = members.map((id) => positions.get(id)).filter(Boolean);
+    const centroid = points.length
       ? {
           x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
           y: points.reduce((sum, point) => sum + point.y, 0) / points.length,
         }
       : { x: 0, y: 0 };
-    const position = place_hyperedge(center);
-    positions.set(hyperedge.id, position);
+    const position = place_diamond(centroid, node_points, placed);
 
     elements.push({
       data: {
@@ -260,7 +449,12 @@ function build_elements(graph) {
 
     for (const id of members) {
       elements.push({
-        data: { id: `e:${hyperedge.id}:${id}`, source: hyperedge.id, target: id },
+        data: {
+          id: `e:${hyperedge.id}:${id}`,
+          source: hyperedge.id,
+          target: id,
+          kind: "超边",
+        },
       });
     }
   }
@@ -282,7 +476,7 @@ export function init(container, data, on_select, on_activate) {
     elements: build_elements(graph),
     style: style_for(palette()),
     layout: { name: "preset" },
-    minZoom: 0.3,
+    minZoom: 0.25,
     maxZoom: 2.4,
     boxSelectionEnabled: false,
   });
@@ -334,7 +528,10 @@ function sync_labels() {
   if (!cy) return;
   const show = cy.zoom() >= LABEL_ZOOM;
   cy.batch(() => {
-    cy.nodes().toggleClass("label-off", !show);
+    cy.nodes("[kind = 'concept'], [kind = 'hyperedge']").toggleClass(
+      "label-off",
+      !show,
+    );
   });
 }
 
@@ -387,6 +584,12 @@ export function apply(state) {
         node.addClass("folded");
         folded.add(node.id());
       }
+    });
+
+    // 簇框随簇一起让位：簇被关掉、或进入 ego 模式时，框里没有东西可框。
+    cy.nodes("[kind = 'cluster']").forEach((node) => {
+      const id = node.id().slice("cluster:".length);
+      if (!enabled.has(id) || current.ego) node.addClass("folded");
     });
 
     cy.edges().forEach((edge) => {
