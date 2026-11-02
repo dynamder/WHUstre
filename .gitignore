@@ -13,6 +13,8 @@ catalog.json
 site/build/
 site/public/app.js
 courses/*/book/
+courses/*/ui/dist/
+courses/*/src/graph-table.html
 
 # 本地预览 / 截图
 shots/

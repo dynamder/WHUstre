@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
 
-// Assembles dist/ from the facade and every built book.
+// Assembles dist/ from the facade, every built book and every course UI bundle.
 // Pure file operations: no subprocesses, so it can run anywhere Node runs.
 
 export function assemble() {
@@ -23,6 +23,7 @@ export function assemble() {
 
   const catalog = JSON.parse(fs.readFileSync(catalog_file, "utf8"));
   let books = 0;
+  let ui_bundles = 0;
 
   for (const course of catalog.courses) {
     const book = path.join(root, "courses", course.slug, "book");
@@ -31,9 +32,20 @@ export function assemble() {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.cpSync(book, target, { recursive: true });
     books += 1;
+
+    // UI bundles sit next to the book rather than inside it, so mdbook can
+    // rebuild book/ without dropping them. The book pages link them relatively:
+    // courses/<slug>/graph.html -> courses/<slug>/ui/graph.js
+    const ui = path.join(root, "courses", course.slug, "ui", "dist");
+    if (fs.existsSync(ui)) {
+      fs.cpSync(ui, path.join(target, "ui"), { recursive: true });
+      ui_bundles += 1;
+    }
   }
 
-  console.log(`dist/: facade + ${books} book(s) -> ${path.relative(root, dist)}`);
+  console.log(
+    `dist/: facade + ${books} book(s) + ${ui_bundles} ui bundle(s) -> ${path.relative(root, dist)}`,
+  );
   return dist;
 }
 

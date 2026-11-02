@@ -2,19 +2,21 @@
   "slug": "industrial-internet",
   "title": "工业互联网基础",
   "code": "II-201",
-  "summary": "概念 · 架构 · 网络 · 平台 · 安全",
+  "summary": "概念 · 架构 · 网络 · 平台 · 安全 · 考点",
   "tags": [
     "工业互联网",
     "标识解析",
     "5G",
     "TSN",
     "数字孪生",
-    "安全"
+    "安全",
+    "期末复习"
   ],
   "status": "active",
   "order": 1,
   "maintainers": [
     "@dynamder"
   ],
-  "updated": "2026-10-31"
+  "updated": "2026-11-03",
+  "ui": [{ "entry": "industrial-internet-graph", "out": "graph.js" }]
 }

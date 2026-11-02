@@ -13,7 +13,7 @@ preferred-dark-theme = "coal"
 mathjax-support = false
 git-repository-url = "https://github.com/dynamder/WHUstre"
 edit-url-template = "https://github.com/dynamder/WHUstre/edit/main/courses/industrial-internet/src/{path}"
-additional-css = ["theme/course.css"]
+additional-css = ["theme/course.css", "theme/graph.css"]
 additional-js = ["theme/course.js"]
 
 [output.html.search]

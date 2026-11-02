@@ -12,6 +12,7 @@ const output = path.join(root, "catalog.json");
 const PART_KINDS = {
   开始: "intro",
   讲义: "notes",
+  图谱: "map",
   速查: "cheatsheet",
   真题: "exam",
   练习: "exam",
@@ -65,6 +66,18 @@ function read_summary(file, slug) {
   return parts.filter((part) => part.chapters.length > 0);
 }
 
+function read_ui(meta) {
+  const ui = Array.isArray(meta.ui) ? meta.ui : [];
+  return ui
+    .filter(
+      (entry) =>
+        entry &&
+        typeof entry.entry === "string" &&
+        typeof entry.out === "string",
+    )
+    .map((entry) => ({ entry: entry.entry, out: entry.out }));
+}
+
 function read_course(slug) {
   const dir = path.join(coursesDir, slug);
   const meta_file = path.join(dir, "meta.json");
@@ -86,6 +99,7 @@ function read_course(slug) {
     order: meta.order ?? 999,
     maintainers: meta.maintainers ?? [],
     updated: meta.updated ?? "",
+    ui: read_ui(meta),
     parts,
   };
 }

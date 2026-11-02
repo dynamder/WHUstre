@@ -1,0 +1,405 @@
+/* 概念图谱页专用样式（book.toml 的 additional-css 加载）。
+   只服务课程自定义 UI：画布 + 侧栏 + 静态总表的打印行为。 */
+
+/* 图页比正文宽：画布在左，侧栏在右。:has 只影响挂了 .graph-page 的页面，
+   其它章节的版式不变。 */
+.content main:has(.graph-page) {
+  max-width: 1180px;
+}
+
+.graph-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  border: 1px solid var(--table-border-color);
+  margin: 1.6em 0;
+  background: var(--bg);
+}
+
+#graph-canvas {
+  height: 64vh;
+  min-height: 440px;
+  border-inline-end: 1px solid var(--table-border-color);
+  background: var(--bg);
+}
+
+#graph-root {
+  max-height: 64vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 900px) {
+  .graph-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #graph-canvas {
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--table-border-color);
+    height: 52vh;
+  }
+
+  #graph-root {
+    max-height: none;
+  }
+}
+
+/* 工具条与过滤 */
+.graph-ui {
+  padding: 12px 14px 18px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.graph-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 「只看考过」是工具条里唯一的散装 chip，不要被 flex 拉满一行。 */
+.graph-tools > .graph-chip {
+  align-self: flex-start;
+}
+
+.graph-search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--table-border-color);
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 4px;
+  padding: 6px 9px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.graph-search:focus {
+  outline: 2px solid var(--links);
+  outline-offset: 1px;
+}
+
+.graph-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.graph-chip {
+  --chip: var(--sidebar-non-existant);
+  border: 1px solid var(--table-border-color);
+  background: transparent;
+  color: var(--fg);
+  opacity: 0.5;
+  border-radius: 999px;
+  padding: 1px 10px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.8;
+  cursor: pointer;
+}
+
+.graph-chip:hover {
+  opacity: 0.85;
+}
+
+.graph-chip.is-on {
+  opacity: 1;
+  border-color: var(--chip);
+  color: var(--chip);
+}
+
+.graph-chip.cluster-intro {
+  --chip: #6b7280;
+}
+
+.graph-chip.cluster-basics {
+  --chip: #0f766e;
+}
+
+.graph-chip.cluster-architecture {
+  --chip: #7c3aed;
+}
+
+.graph-chip.cluster-network {
+  --chip: #1f6feb;
+}
+
+.graph-chip.cluster-platform {
+  --chip: #b45309;
+}
+
+.graph-chip.cluster-security {
+  --chip: #b91c1c;
+}
+
+.graph-help {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--sidebar-non-existant);
+}
+
+/* 搜索结果 */
+.graph-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 10px 0 0;
+  border-top: 1px solid var(--table-border-color);
+  padding-top: 8px;
+}
+
+.graph-result {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: start;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.graph-result:hover,
+.graph-result.is-active {
+  background: var(--theme-hover);
+}
+
+.graph-result.is-active {
+  outline: 1px solid var(--links);
+}
+
+.graph-result-cluster {
+  color: var(--sidebar-non-existant);
+  font-size: 11px;
+}
+
+/* 侧栏卡片。mdbook 的正文样式挂在 #mdbook-content 上（ID 级），
+   侧栏里的同名元素（标题、段落、表格）要用 #graph-root 显式盖掉。 */
+#graph-root .graph-hint,
+#graph-root .graph-muted {
+  margin: 0;
+  color: var(--sidebar-non-existant);
+  font-size: 12.5px;
+}
+
+#graph-root h2,
+#graph-root h3 {
+  font-family: inherit;
+  border-top: 0;
+  padding-top: 0;
+}
+
+#graph-root .graph-card-title {
+  margin: 0;
+}
+
+#graph-root .graph-block-title {
+  margin: 14px 0 2px;
+}
+
+.graph-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#graph-root .graph-card-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.4;
+  border: 0;
+}
+
+.graph-tag {
+  flex: none;
+  font-size: 11px;
+  color: var(--sidebar-non-existant);
+  border: 1px solid var(--table-border-color);
+  border-radius: 999px;
+  padding: 0 8px;
+}
+
+#graph-root .graph-aliases {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--sidebar-non-existant);
+}
+
+#graph-root .graph-block-title {
+  margin: 14px 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--sidebar-non-existant);
+  border: 0;
+}
+
+#graph-root .graph-block p {
+  margin: 0;
+  max-width: none;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.graph-question {
+  margin-inline-end: 8px;
+  white-space: nowrap;
+}
+
+.graph-edge-card {
+  border: 1px solid var(--table-border-color);
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 8px 0 0;
+}
+
+.graph-edge-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.graph-edge-kind {
+  flex: none;
+  font-size: 10.5px;
+  color: var(--links);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 5px;
+}
+
+.graph-edge-label {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+#graph-root .graph-edge-table {
+  margin: 6px 0 0;
+  font-size: 12px;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#graph-root .graph-edge-table th {
+  text-align: start;
+  vertical-align: top;
+  white-space: nowrap;
+  color: var(--sidebar-non-existant);
+  font-weight: 400;
+  border: 0;
+  padding: 2px 8px 2px 0;
+}
+
+#graph-root .graph-edge-table td {
+  padding: 2px 0;
+  border: 0;
+}
+
+/* 矩阵与选型有多列，侧栏只有 360px：列之间留一点气口，别让字数挤成一片。 */
+#graph-root .graph-edge-table td + td,
+#graph-root .graph-edge-table th + th {
+  padding-inline-start: 10px;
+}
+
+#graph-root .graph-edge-table thead th {
+  font-size: 11px;
+  padding-bottom: 3px;
+}
+
+#graph-root .graph-roles p {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+}
+
+#graph-root .graph-edge-note,
+#graph-root .graph-edge-result {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--sidebar-non-existant);
+}
+
+.graph-linkish {
+  border: 0;
+  background: transparent;
+  color: var(--links);
+  font: inherit;
+  font-size: inherit;
+  padding: 0;
+  margin-inline-end: 6px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.graph-card-foot {
+  margin-top: 16px;
+  border-top: 1px solid var(--table-border-color);
+  padding-top: 8px;
+  font-size: 12.5px;
+}
+
+/* 静态总表 */
+.concept-table {
+  font-size: 13px;
+}
+
+/* 簇名与题号都是短字段，别被长定义挤成竖排。 */
+.concept-table th:first-child,
+.concept-table td:first-child,
+.concept-table th:last-child,
+.concept-table td:last-child {
+  white-space: nowrap;
+}
+
+.concept-table .caliber {
+  display: block;
+  font-size: 11.5px;
+  color: var(--sidebar-non-existant);
+  margin-top: 2px;
+}
+
+/* 关系总表：成员是概念名，不是短字段，允许换行；矩阵格子再降一档字号。 */
+.concept-table .edge-role {
+  color: var(--sidebar-non-existant);
+}
+
+.concept-table .edge-member {
+  white-space: nowrap;
+}
+
+.concept-table .edge-cells {
+  font-size: 11.5px;
+  margin-top: 6px;
+  width: 100%;
+}
+
+.concept-table .edge-cells th:first-child,
+.concept-table .edge-cells td:first-child,
+.concept-table .edge-cells td:last-child,
+.concept-table.relation-table td:last-child {
+  white-space: normal;
+}
+
+/* 打印：canvas 打出来是空白，也只留总表。 */
+@media print {
+  .graph-page,
+  .graph-tools,
+  .graph-results,
+  .graph-help {
+    display: none;
+  }
+
+  #graph-canvas,
+  #graph-root {
+    display: none;
+  }
+
+  .concept-table {
+    font-size: 9pt;
+  }
+}

@@ -19,7 +19,7 @@
 │ 课程资料库        [ 搜索课程、章节或动作        Ctrl K ]        GitHub │
 ├────────────────────┬─────────────────────────────────────────────────┤
 │ 课程 6             │  工业互联网基础                                 │
-│ ▌工业互联网基础 11 │  II-201 · 11 页 · 更新 2026-10-31               │
+│ ▌工业互联网基础 9  │  II-201 · 9 页 · 更新 2026-11-03                │
 │ 互换性与技术测量 7 │  ME-204 · 7 页 · 更新 2026-11-01                │
 │  理论力学   待认领 │  机构 · 四杆 · 电机 · 齿轮                      │
 │  材料力学   待认领 │  [开始] [讲义] [速查] [真题] [附录]             │
@@ -53,19 +53,23 @@
 .
 ├── courses/
 │   ├── industrial-internet/    # 一门课 = 一本 mdbook
-│   │   ├── meta.json           # 门面读：标题、代码、标签、状态、维护者
+│   │   ├── meta.json           # 门面读：标题、代码、标签、状态、维护者、ui
 │   │   ├── book.toml           # mdbook 配置
-│   │   ├── theme/              # 与门面对齐的 mdbook 主题 + 返回胶囊
+│   │   ├── theme/              # 与门面对齐的 mdbook 主题 + 返回胶囊 + 图页样式
+│   │   ├── ui/dist/            # 课程 UI 构建产物（被 .gitignore）
 │   │   └── src/
 │   │       ├── SUMMARY.md      # 目录（Part 标题决定内容类型）
 │   │       ├── ch01.md ...     # 章节
+│   │       ├── graph.md        # 课程 UI 的挂载页 + 静态总表
 │   │       └── assets/figs/    # 图片
 │   ├── mechanics/              # 只有 meta.json 的“待认领”课程
 │   └── ...
 ├── site/                       # Gleam + Lustre 门面
 │   ├── src/                    # catalog / data / results / view / ffi
+│   │   └── courses/<slug>/     # 课程 UI 的 Gleam 模块（数据 + MVU + FFI）
+│   ├── test/                   # 引用完整性等测试
 │   ├── public/                 # index.html、styles.css、vendor/mathjax
-│   └── scripts/                # esbuild 打包、依赖处理
+│   └── scripts/                # esbuild 打包、课程 UI 入口、静态页面片段
 ├── scripts/                    # 构建编排 + 插图脚本
 ├── docs/                       # 设计文档 + 截图
 └── dist/                       # 构建产物（被 .gitignore）
@@ -84,25 +88,33 @@
 ```bash
 cd site
 gleam deps download
-npm install        # 只为 esbuild
+node scripts/strip-priv.mjs   # Windows 无开发者模式时去掉 priv 软链接
+npm install                   # esbuild + cytoscape（课程 UI 用）
 cd ..
 ```
 
 然后：
 
 ```bash
-npm run build      # catalog -> mdbook -> gleam -> bundle -> dist/
+npm run build      # catalog -> gleam -> bundle -> 静态表 -> mdbook -> dist/
 npm run serve      # http://127.0.0.1:5173/
 npm run dev        # build + serve
 ```
 
-`npm run build` 做四件事：
+`npm run build` 做五件事：
 
 1. `scripts/gen-catalog.mjs`：扫 `courses/*/meta.json` 和 `src/SUMMARY.md`，
    生成 `catalog.json`（门面在构建期内联，运行时零请求）；
-2. 对每门有 `src/SUMMARY.md` 的课执行 `mdbook build`；
-3. `site/` 里 `gleam build` + esbuild 打成 `app.js`；
-4. `scripts/assemble.mjs` 把门面和所有书组装进 `dist/`。
+2. `site/` 里 `gleam build`，编译门面与各课程 UI 模块；
+3. esbuild 打包门面 `app.js`，并按每门课的 `ui` 字段把课程 UI 入口打进
+   `courses/<slug>/ui/dist/`；`site/scripts/gen-graph-table.mjs` 从同一份 Gleam
+   数据生成图页的静态总表；
+4. 对每门有 `src/SUMMARY.md` 的课执行 `mdbook build`；
+5. `scripts/assemble.mjs` 把门面、所有书和课程 UI 产物组装进 `dist/`。
+
+课程 UI 的产物**不写进 `book/`**：mdbook 每次重建都会清空输出目录。产物落在
+`courses/<slug>/ui/dist/`，由 assemble 拷到 `dist/courses/<slug>/ui/`，书的页面用
+相对路径 `ui/graph.js` 引用。
 
 ## 加一门课
 
@@ -134,6 +146,7 @@ npm run dev        # build + serve
    | --- | --- | --- |
    | `# 开始` | `intro` | 开始 |
    | `# 讲义` | `notes` | 讲义 |
+   | `# 图谱` | `map` | 图谱 |
    | `# 速查` | `cheatsheet` | 速查 |
    | `# 真题` / `# 练习` | `exam` | 真题 |
    | `# 附录` | `appendix` | 附录 |
@@ -141,6 +154,51 @@ npm run dev        # build + serve
    没有 `SUMMARY.md` 的课按“待认领”处理。
 
 4. `npm run build`。门面会自动出现新课程，不需要改 Gleam 代码。
+
+## 课程自定义 UI
+
+课程可以带自己的页面：一个 Lustre 程序 + 一个 mdbook 挂载页。没有视图注册表——
+多一个页面就多一个入口文件，多一门课就多一个模块。
+
+1. 在 `meta.json` 里声明入口：
+
+   ```json
+   "ui": [{ "entry": "industrial-internet-graph", "out": "graph.js" }]
+   ```
+
+   `entry` 对应 `site/scripts/entries/<entry>.js`，`out` 是 `ui/dist/` 下的文件名。
+   `gen-catalog.mjs` 把 `ui` 带进 `catalog.json`，`bundle.mjs` 按它逐个打包。
+
+2. 入口只有一句 `mount`：
+
+   ```js
+   import { mount } from "../../build/dev/javascript/catalog/courses/industrial_internet/graph.mjs";
+
+   mount("#graph-root");
+   ```
+
+3. Gleam 模块放在 `site/src/courses/<slug>/`：
+
+   | 文件 | 作用 |
+   | --- | --- |
+   | `concepts.gleam` | 概念、超边、题号数据 + 查询 + 序列化 |
+   | `graph.gleam` | MVU（init / update / view）与 `mount` |
+   | `cyto.gleam` / `cyto_ffi.mjs` | Cytoscape 边界：画布、状态、键盘 |
+
+   数据写在 Gleam 里，类型即校验；超边引用完整性、id 唯一、空定义、题号越界由
+   `site/test/concepts_test.gleam` 兜住，`cd site && npm test` 可跑。
+
+4. 挂载页是 `courses/<slug>/src/graph.md`：留 `<div id="graph-root">` 和画布
+   `<div id="graph-canvas">`，加一行 `<script type="module" src="ui/graph.js">`。
+   画布不放进 Lustre 的渲染子树，MVU 重画时不会把 Cytoscape 的 DOM 换掉。
+
+5. 打印与无 JS 用的总表由 `site/scripts/gen-graph-table.mjs` 从同一份 Gleam 数据
+   生成到 `src/graph-table.html`（被 `.gitignore`），页面用 mdbook 的
+   `{{#include}}` 引入。所以构建顺序是先 `gleam build`、再 `bundle` / 生成片段、
+   最后 `mdbook build`。图页样式在 `courses/<slug>/theme/graph.css`。
+
+当前只接了工业互联网的图谱页，数据还是占位的一小片：六簇约 90 个概念、题号与
+完整超边是下一轮内容工作。设计取舍见 [docs/course-ui.md](docs/course-ui.md)。
 
 ## 交互与 URL
 

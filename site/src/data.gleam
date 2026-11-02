@@ -152,6 +152,7 @@ pub fn kind_label(kind: String) -> String {
   case kind {
     "intro" -> "开始"
     "notes" -> "讲义"
+    "map" -> "图谱"
     "cheatsheet" -> "速查"
     "exam" -> "真题"
     "appendix" -> "附录"
