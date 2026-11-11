@@ -16,9 +16,10 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
-from gdt import Fig, INK, RED, BLUE, GRAY, W_THICK, W_THIN
+from gdt import (Fig, INK, RED, BLUE, GRAY, W_THICK, W_THIN,
+                 roughness, uniform_roughness)
 from fig_ic_parts import (stepped_shaft, sleeve_section, plate_top,
-                          bearing_section)
+                          bearing_section, key_joint_cross)
 
 OUT = os.path.abspath(
     os.path.join(HERE, "..", "..", "courses", "interchangeability", "src", "assets", "figs")
@@ -181,41 +182,98 @@ def biaozhu3(which: str):
 
 # ---------------------------------------------------------------- 标注 4（应用）
 def biaozhu4(which: str):
-    """滚动轴承装配（断面）：标轴颈 / 外壳孔配合代号 + 轴颈径向圆跳动。"""
-    f = Fig(760, 640)
-    a = bearing_section(f, cx=360, cy=290, r_shaft=36, r_in_out=54,
+    """滚动轴承装配（断面）：配合代号 + 轴颈径向圆跳动 + 表面粗糙度。"""
+    f = Fig(800, 700)
+    a = bearing_section(f, cx=400, cy=320, r_shaft=36, r_in_out=54,
                         r_out_in=72, r_out_out=90, r_housing=112)
     f.text(120, 112, "轴颈", size=12.5, anchor="middle")
-    f.leader([(120, 124), (360 - 26, 290 - 26)])
-    f.text(660, 112, "外壳孔", size=12.5, anchor="middle")
-    f.leader([(660, 124), (360 + 64, 290 - 64)])
-    f.text(120, 470, "断面示意：轴 / 内圈 / 滚动体 / 外圈 / 壳体", size=11,
+    f.leader([(120, 124), (400 - 26, 320 - 26)])
+    f.text(680, 112, "外壳孔", size=12.5, anchor="middle")
+    f.leader([(680, 124), (400 + 64, 320 - 64)])
+    f.text(120, 654, "断面示意：轴 / 内圈 / 滚动体 / 外圈 / 壳体", size=11,
            color=GRAY, anchor="start")
 
     if which == "a":
+        # ① ② 配合代号
         f.text(120, 170, "φ50k6", size=14, color=RED, weight="bold")
-        f.text(120, 188, "基孔制", size=11, color=RED)
-        f.text(660, 170, "φ90H7", size=14, color=RED, weight="bold")
-        f.text(660, 188, "基轴制", size=11, color=RED)
-        r1 = f.frame(430, 520, [("sym", "circular_runout"), ("val", "0.01"),
+        f.text(120, 188, "（基孔制）", size=11, color=RED)
+        f.text(680, 170, "φ90H7", size=14, color=RED, weight="bold")
+        f.text(680, 188, "（基轴制）", size=11, color=RED)
+        # ③ 形位公差：轴颈径向圆跳动
+        r1 = f.frame(470, 560, [("sym", "circular_runout"), ("val", "0.01"),
                                 ("dat", "A")])
-        f.leader([(r1["x0"], r1["cy"]), (430, 430), (400, 332)], head=False)
-        f.arrowhead(386, 316, -135)
-        f.datum(360, 290 + 136, "down", "A")
+        f.leader([(r1["x0"], r1["cy"]), (470, 470), (420, 348)], head=False)
+        f.arrowhead(408, 334, -135)
+        f.datum(400, 320 + 136, "down", "A")
+        # ④ ⑤ 表面粗糙度：轴颈 / 外壳孔
+        roughness(f, 190, 430, "Ra 1.6", mode="remove", s=24)
+        f.leader([(190, 430), (400 - 30, 320 + 16)], head=False, size=6)
+        f.dot(400 - 30, 320 + 16, r=2.2, color=RED)
+        roughness(f, 610, 430, "Ra 3.2", mode="remove", s=24)
+        f.leader([(610, 430), (400 + 58, 320 + 58)], head=False, size=6)
+        f.dot(400 + 58, 320 + 58, r=2.2, color=RED)
+        uniform_roughness(f, 590, 640, "Ra 6.3")
         badge(f, 1, 120, 96, color=RED)
-        badge(f, 2, 660, 96, color=RED)
-        badge(f, 3, 470, 336, color=RED)
+        badge(f, 2, 680, 96, color=RED)
+        badge(f, 3, 440, 300, color=RED)
+        badge(f, 4, 158, 396, color=RED)
+        badge(f, 5, 646, 396, color=RED)
     else:
-        note(f, 60, 480, "0 级深沟球轴承：内径 d=φ50，外径 D=φ90。", size=12)
-        note(f, 60, 508, "(1) 写出轴颈、外壳孔在装配图上应标注的尺寸公差带代号，", size=11.5)
-        note(f, 60, 528, "     并说明各采用什么基准制；", size=11.5)
-        note(f, 60, 556, "(2) 把这两个代号标在图上；", size=11.5)
-        note(f, 60, 584, "(3) 若要求轴颈对轴承配合面的径向圆跳动不超过 0.01，", size=11.5)
-        note(f, 60, 604, "     应如何标注？", size=11.5)
+        note(f, 60, 470, "0 级深沟球轴承：内径 d=φ50，外径 D=φ90。", size=12)
+        note(f, 60, 498, "在装配图上完成（尺寸公差 + 形位公差 + 表面粗糙度）：", size=11.5)
+        note(f, 60, 526, "(1) 写出轴颈、外壳孔的尺寸公差带代号，并说明基准制；", size=11.5)
+        note(f, 60, 554, "(2) 轴颈对轴承配合面的径向圆跳动不超过 0.01，如何标注？", size=11.5)
+        note(f, 60, 582, "(3) 轴颈 Ra 1.6、外壳孔 Ra 3.2，其余 Ra 6.3，请标注。", size=11.5)
     f.save(os.path.join(OUT, f"bz4-{'q' if which == 'q' else 'a'}.png"))
 
 
+def biaozhu5(which: str):
+    """键连接（平键）断面：尺寸公差 + 对称度 + 表面粗糙度。"""
+    f = Fig(820, 620)
+    cx, cy = 330, 300
+    a = key_joint_cross(f, cx=cx, cy=cy, r_shaft=64, r_hub=112,
+                        width=41, t1=13, t2=8)
+    half, h_s = a["half"], a["h_s"]
+    y_dim = 92
+    for x in (cx - half, cx + half):
+        f.line(x, cy - h_s + 4, x, y_dim, w=W_THIN, color=GRAY)
+    f.line(cx - half, y_dim, cx + half, y_dim, w=W_THIN)
+    f.arrowhead(cx - half, y_dim, 180)
+    f.arrowhead(cx + half, y_dim, 0)
+    f.text(cx, y_dim - 13, "16", size=13)
+
+    if which == "a":
+        # ① 对称度：被测是键槽中心平面 → 指引线与 16 的尺寸线对齐
+        f.line(cx + half, y_dim, 500, y_dim, w=W_THIN)
+        f.frame(500, y_dim - 13, [("sym", "symmetry"), ("val", "0.02"),
+                                  ("dat", "A")])
+        f.datum(cx, cy + 148, "down", "A")
+        # ② 轴槽宽配合（轴槽与键）
+        note(f, 600, 330, "16N9/h8", size=13)
+        f.leader([(596, 326), (cx + half + 4, cy - 56)], head=False, size=6)
+        f.dot(cx + half + 4, cy - 56, r=2.2, color=RED)
+        # ③ 轮毂槽宽配合
+        note(f, 600, 250, "16JS9/h8", size=13)
+        f.leader([(596, 246), (cx + half + 4, cy - 66)], head=False, size=6)
+        f.dot(cx + half + 4, cy - 66, r=2.2, color=RED)
+        # ④ 槽侧面 Ra 3.2（注在尺寸界线延长线上）
+        roughness(f, cx - half, cy - 150, "Ra 3.2", mode="remove", s=22, angle=-90)
+        f.dot(cx - half, cy - 150, r=2.2, color=RED)
+        uniform_roughness(f, 560, 520, "Ra 6.3", s=22)
+        badge(f, 1, 506, y_dim - 40, color=RED)
+        badge(f, 2, 704, 306, color=RED)
+        badge(f, 3, 704, 226, color=RED)
+        badge(f, 4, 246, 122, color=RED)
+    else:
+        note(f, 60, 460, "键连接（平键）：轴 φ50，键 16×10，一般联结。", size=12)
+        note(f, 60, 488, "在装配图上完成（尺寸公差 + 形位公差 + 表面粗糙度）：", size=11.5)
+        note(f, 60, 516, "(1) 标出轴槽、轮毂槽的键宽配合代号（键宽 h8，标准件不标）；", size=11.5)
+        note(f, 60, 544, "(2) 键槽两侧面对轴线的对称度 0.02，基准 A 为轴线；", size=11.5)
+        note(f, 60, 572, "(3) 键槽侧面 Ra 3.2、槽底 Ra 6.3、其余 Ra 6.3。", size=11.5)
+    f.save(os.path.join(OUT, f"bz5-{'q' if which == 'q' else 'a'}.png"))
+
+
 if __name__ == "__main__":
-    for fn in (biaozhu1, biaozhu2, biaozhu3, biaozhu4):
+    for fn in (biaozhu1, biaozhu2, biaozhu3, biaozhu4, biaozhu5):
         for w in ("q", "a"):
             fn(w)
