@@ -226,3 +226,35 @@ if __name__ == "__main__":
     for k in ("E", "M", "L"):
         tol_diagram(k)
     bianjie()
+
+
+def roughness_card():
+    """表面粗糙度：三种符号 + 注法位置 + 统一注法。"""
+    from gdt import roughness, uniform_roughness
+    f = Fig(760, 420)
+    # 三种符号
+    f.line(60, 150, 560, 150, w=2.4)
+    roughness(f, 130, 150, "Ra 3.2", mode="basic")
+    roughness(f, 300, 150, "Ra 3.2", mode="remove")
+    roughness(f, 470, 150, "Ra 1.6", mode="none")
+    f.text(130, 220, "基本符号（任何方法）", size=11, color=GRAY)
+    f.text(300, 220, "去除材料（切削）", size=11, color=GRAY)
+    f.text(470, 220, "不去除材料（铸锻）", size=11, color=GRAY)
+
+    # 尖端指向表面
+    f.rect(620, 90, 120, 60, sw=2.4)
+    roughness(f, 620, 120, "Ra 6.3", mode="remove", angle=-90)
+    f.text(680, 176, "尖端指向表面", size=10.5, color=GRAY)
+
+    # 统一注法
+    uniform_roughness(f, 120, 330, "Ra 6.3")
+    f.text(120, 372, "统一注法：写在图样右上角或技术要求中，", size=11, color=GRAY,
+           anchor="start")
+    f.text(120, 392, "表示「图上未注明的表面」。", size=11, color=GRAY, anchor="start")
+
+    f.text(430, 330, "参数写在符号上方（长边一侧）：", size=11, anchor="start")
+    f.text(430, 352, "Ra 3.2 / Rz 6.3 / Ra 1.6", size=11.5, anchor="start",
+           weight="bold")
+    f.text(430, 384, "上限值直接写；需要下限时写「max / min」", size=10.5,
+           color=GRAY, anchor="start")
+    f.save(os.path.join(OUT, "czd-fuhao.png"))

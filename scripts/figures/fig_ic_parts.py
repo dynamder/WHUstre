@@ -224,3 +224,53 @@ def bearing_section(f: Fig, cx=180, cy=180, r_shaft=34, r_in_out=52,
 
 def _fmt(v: float) -> str:
     return f"{v:.2f}".rstrip("0").rstrip(".")
+
+
+# ---------------- 平键联结（横断面） ----------------
+
+def _arc(cx, cy, r, a0, a1, n=90):
+    return [(cx + r * math.cos(a0 + (a1 - a0) * i / (n - 1)),
+             cy + r * math.sin(a0 + (a1 - a0) * i / (n - 1))) for i in range(n)]
+
+
+def key_joint_cross(f: Fig, cx=300, cy=280, r_shaft=54, r_hub=96,
+                    width=32, t1=22, t2=18):
+    """平键联结横断面：轴（带键槽）+ 键 + 轮毂（带键槽），用于「键连接」应用题。"""
+    half = width / 2.0
+    h_s = math.sqrt(r_shaft ** 2 - half ** 2)
+    h_h = math.sqrt(r_hub ** 2 - half ** 2)
+    key_bot = cy - r_shaft + t1
+    key_top = cy - r_shaft - t2
+    a_r = math.atan2(-h_s, half)
+    a_l = math.atan2(-h_s, -half)
+
+    # 轴：整圆去掉上方键槽
+    shaft = _arc(cx, cy, r_shaft, a_r, a_l + 2 * math.pi, 120)
+    shaft += [(cx - half, key_bot), (cx + half, key_bot)]
+    f.hatch(shaft, spacing=8, angle=45)
+
+    # 轮毂：环形（外圆 + 内孔，同一角度起止形成零宽切口）
+    ring = _arc(cx, cy, r_hub, a_r, a_r + 2 * math.pi, 150)
+    ring += list(reversed(_arc(cx, cy, r_shaft, a_r, a_r + 2 * math.pi, 120)))
+    f.hatch(ring, spacing=8, angle=-45)
+
+    # 挖掉轮毂键槽处的剖面线
+    notch = [(cx - half, cy - h_s), (cx - half, key_top), (cx + half, key_top),
+             (cx + half, cy - h_s)]
+    notch += _arc(cx, cy, r_shaft, a_r, a_l, 40)
+    f.poly(notch, close=True, fill="#ffffff", color="none", w=0)
+
+    # 键（不剖，白底）
+    f.rect(cx - half, key_top, width, key_bot - key_top, sw=W_THICK, fill="#ffffff")
+
+    # 轮廓线
+    f.circle(cx, cy, r_hub, sw=W_THICK)
+    f.poly(shaft, w=W_THICK, close=True)
+    f.poly([(cx - half, cy - h_s), (cx - half, key_top), (cx + half, key_top),
+            (cx + half, cy - h_s)], w=W_THICK)
+
+    f.centerline(cx - r_hub - 26, cy, cx + r_hub + 26, cy)
+    f.centerline(cx, cy - r_hub - 26, cx, cy + r_hub + 26)
+    return {"cx": cx, "cy": cy, "r_shaft": r_shaft, "r_hub": r_hub,
+            "half": half, "key_top": key_top, "key_bot": key_bot,
+            "h_s": h_s, "h_h": h_h, "a_r": a_r, "a_l": a_l}
