@@ -1,6 +1,7 @@
 # 本地缓存 / 虚拟环境
 .cache/
 .mplconfig/
+.pylibs/
 __pycache__/
 *.py[cod]
 .venv/
