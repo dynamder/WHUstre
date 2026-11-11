@@ -2,10 +2,11 @@
   "slug": "interchangeability",
   "title": "互换性与技术测量",
   "code": "ME-204",
-  "summary": "公差配合 · 几何公差 · 测量 · 标注改错",
+  "summary": "公差配合 · 几何公差 · 公差原则 · 测量 · 标注改错",
   "tags": [
     "公差与配合",
     "几何公差",
+    "公差原则",
     "测量技术",
     "滚动轴承",
     "螺纹",
@@ -14,5 +15,5 @@
   "status": "active",
   "order": 4,
   "maintainers": [],
-  "updated": "2026-11-01"
+  "updated": "2026-11-11"
 }
