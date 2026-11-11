@@ -151,7 +151,16 @@ def gaicuo3(which: str):
 
     hdim(a["x0"], h1x, "75", True)
     hdim(h1x, h2x, "120", which == "a")
-    f.dim_v(h1y, a["y1"], a["x1"] + 62, "62", ext_x=h2x + 14)
+    # 孔到底面 62（答图里也要加方框）
+    x62 = a["x1"] + 62
+    f.line(h2x + 14, h1y, x62 + 7, h1y, w=W_THIN, color=GRAY)
+    f.line(h2x + 14, a["y1"], x62 + 7, a["y1"], w=W_THIN, color=GRAY)
+    f.line(x62, h1y, x62, a["y1"], w=W_THIN)
+    f.arrowhead(x62, h1y, 90)
+    f.arrowhead(x62, a["y1"], 270)
+    mid = (h1y + a["y1"]) / 2
+    f.rect(x62 - 10, mid - 19, 20, 38, sw=W_THIN, fill="#ffffff")
+    f.text(x62, mid, "62", size=13, rotate=-90)
 
     # ① 位置度（两孔）
     r1 = f.frame(54, 54, [("sym", "position"),
@@ -177,7 +186,8 @@ def gaicuo3(which: str):
         note(f, 54, 148, "① 位置度公差带是直径为 φt 的圆柱面 → 必须加 φ")
         tag(f, 2, (h1x + h2x) / 2 + 40, yv - 30, color=RED)
         note(f, 150, yv + 62, "② 理论正确尺寸必须加方框（只改注法，不改公差值）", size=11.5)
-        f.mark_circle(r3["x1"] - 12, r3["cy"], 14, 15, color=RED)
+        f.mark_circle((r3["x0"] + r3["x1"]) / 2, r3["cy"],
+                      (r3["x1"] - r3["x0"]) / 2 + 8, 17, color=RED)
         note(f, 452, 452, "③ 平面度是形状公差 → 不加 φ，也不标基准", size=11.5)
     f.save(os.path.join(OUT, f"gc3-{'q' if which == 'q' else 'a'}.png"))
 
