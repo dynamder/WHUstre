@@ -258,3 +258,48 @@ def roughness_card():
     f.text(430, 384, "上限值直接写；需要下限时写「max / min」", size=10.5,
            color=GRAY, anchor="start")
     f.save(os.path.join(OUT, "czd-fuhao.png"))
+
+
+def _arc_arrow(f, cx, cy, r, a0, a1, color=INK, w=1.6, head=9.0):
+    import math
+    n = 40
+    pts = [(cx + r * math.cos(math.radians(a0 + (a1 - a0) * i / (n - 1))),
+            cy + r * math.sin(math.radians(a0 + (a1 - a0) * i / (n - 1))))
+           for i in range(n)]
+    f.poly(pts, w=w, color=color)
+    (x1, y1), (x2, y2) = pts[-2], pts[-1]
+    f.arrowhead(x2, y2, math.degrees(math.atan2(y2 - y1, x2 - x1)),
+                size=head, color=color)
+
+
+def bearing_load_types():
+    """滚动轴承的三种负荷类型：局部 / 循环 / 摆动。"""
+    f = Fig(780, 300)
+    cx0, cy, R, r = 130, 150, 62, 38
+    titles = ["局部负荷", "循环负荷", "摆动负荷"]
+    subs = ["套圈不转：负荷总压在\n同一段滚道上",
+            "套圈转：负荷依次压过\n整个滚道",
+            "套圈摆动：介于两者\n之间"]
+    for i in range(3):
+        cx = cx0 + i * 250
+        f.circle(cx, cy, R, sw=W_THICK)
+        f.circle(cx, cy, r, sw=W_THICK)
+        f.circle(cx, cy, (R + r) / 2, sw=0.8)
+        # 径向负荷（固定方向）
+        f.line(cx, 42, cx, cy - R - 3, w=2.0)
+        f.arrowhead(cx, cy - R - 3, 90, size=10)
+        f.text(cx + 6, 48, "F", size=12, anchor="start", weight="bold")
+        # 承受负荷的滚道标记
+        f.line(cx - 10, cy - R + 3, cx + 10, cy - R + 3, w=3.0, color=RED)
+        if i == 0:
+            f.line(cx - 26, cy - 84, cx - 6, cy - 64, w=1.4, color=GRAY)
+            f.line(cx - 6, cy - 84, cx - 26, cy - 64, w=1.4, color=GRAY)
+        elif i == 1:
+            _arc_arrow(f, cx, cy, R + 16, -30, 210, color=BLUE)
+        else:
+            _arc_arrow(f, cx, cy, R + 16, -40, 20, color=BLUE)
+            _arc_arrow(f, cx, cy, R + 16, 200, 140, color=BLUE)
+        f.text(cx, cy + R + 40, titles[i], size=13, weight="bold")
+        for j, line in enumerate(subs[i].split("\n")):
+            f.text(cx, cy + R + 62 + j * 17, line, size=10.5, color=GRAY)
+    f.save(os.path.join(OUT, "ch7-fuhe-leixing.png"))
