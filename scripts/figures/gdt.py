@@ -356,9 +356,11 @@ def _sym_profile_surface(f, cx, cy, s, lw):
 
 
 def _sym_parallelism(f, cx, cy, s, lw):
-    d = s * 0.30
-    f.line(cx - s * 0.52 + d, cy + s * 0.52, cx - s * 0.12 + d, cy - s * 0.52, w=lw, color=INK)
-    f.line(cx - s * 0.12 - d * 0.1, cy + s * 0.52, cx + s * 0.28 - d * 0.1, cy - s * 0.52, w=lw, color=INK)
+    """两条平行斜线（GB 的平行度符号），两线间距要明显可见。"""
+    gap = s * 0.34
+    for off in (-gap / 2, gap / 2):
+        f.line(cx + off - s * 0.30, cy + s * 0.54,
+               cx + off + s * 0.30, cy - s * 0.54, w=lw, color=INK)
 
 
 def _sym_perpendicularity(f, cx, cy, s, lw):
@@ -492,3 +494,49 @@ def size_label(f: Fig, x, y, base, dev=None, mod=None, size=13.0, sub=9.5,
         circled(f, right + 11, y, mod, r=7.5, size=10.5, color=color)
         right += 22
     return right
+
+
+# ---------------- 表面粗糙度 ----------------
+
+def roughness(f: Fig, x, y, value=None, mode="remove", s=26.0, size=11.5,
+              color=INK, angle=0.0, extra=None):
+    """表面粗糙度符号：顶点落在 (x, y)（被注表面）上。
+
+    mode: "basic" 基本符号（任何方法，不能单独使用）
+          "remove" 用去除材料方法获得（加横线）
+          "none"  用不去除材料方法获得（加圆）
+    angle: 符号整体绕顶点旋转的角度（度，顺时针为正）；0 = 正立、朝上
+    value: 幅度参数文本，如 "Ra 3.2"
+    """
+    a = math.radians(60)
+    ca, sa = math.cos(math.radians(angle)), math.sin(math.radians(angle))
+
+    def rot(px, py):
+        return (x + px * ca - py * sa, y + px * sa + py * ca)
+
+    tip = (x, y)
+    short = rot(-s * math.cos(a), -s * math.sin(a))
+    long_ = rot(s * 1.9 * math.cos(a), -s * 1.9 * math.sin(a))
+    f.line(*tip, *short, w=1.5, color=color)
+    f.line(*tip, *long_, w=1.5, color=color)
+    if mode == "remove":
+        f.line(*short, *long_, w=1.5, color=color)
+    elif mode == "none":
+        cxm, cym = rot(0, -s * 0.42)
+        f.circle(cxm, cym, s * 0.20, sw=1.3, color=color)
+    if value:
+        tx, ty = rot(s * 1.9 * math.cos(a) * 0.55, -s * 1.9 * math.sin(a) - 8)
+        f.text(tx, ty, value, size=size, color=color, anchor="middle",
+               weight="bold", rotate=angle if angle else None)
+    if extra:
+        ex, ey = rot(s * 1.9 * math.cos(a) + 8, -s * 1.9 * math.sin(a) + 2)
+        f.text(ex, ey, extra, size=size * 0.92, color=color, anchor="start")
+
+
+def uniform_roughness(f: Fig, x, y, value, note="其余", s=26.0, size=12.0,
+                      color=INK):
+    """统一注法：符号 + 「其余」+ 参数（一般写在图样右上角或技术要求里）。"""
+    f.text(x, y - 46, note, size=size, color=color, anchor="start")
+    f.text(x + 40, y - 46, value, size=size, color=color, anchor="start",
+           weight="bold")
+    roughness(f, x + 20, y, None, mode="remove", s=s, color=color)

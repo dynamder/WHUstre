@@ -65,7 +65,7 @@ def gaicuo1(which: str):
                            ("val", "0.02" if which == "q" else "φ0.02"), ("dat", "A")])
     led(f, r2, [(190, r2["cy"]), (190, bb + 2)], side="right", head=False)
     # ③ 平行度（轴肩端面 → φ40 轴线 A）
-    r3 = f.frame(846, 54, [("sym", "parallelism"), ("val", "0.02")]
+    r3 = f.frame(846, 54, [("sym", "perpendicularity"), ("val", "0.02")]
                  + ([("dat", "A")] if which == "a" else []),
                  anchor="right")
     led(f, r3, [(520, r3["cy"]), (520, oy - 34), (x1 + 3, oy - 34)])
@@ -80,7 +80,7 @@ def gaicuo1(which: str):
         f.mark_circle(r2["x0"] + 42, r2["cy"], 26, 15, color=RED)
         note(f, 54, 420, "② 同轴度的公差带是圆柱面 → 必须加 φ")
         f.mark_circle(r3["x1"] - 13, r3["cy"], 15, 15, color=RED)
-        note(f, 620, 130, "③ 平行度是定向公差，必须有基准 → 补 A")
+        note(f, 560, 130, "③ 端面对轴线垂直：定向公差必须有基准 → 补 A")
     f.save(os.path.join(OUT, f"gc1-{'q' if which == 'q' else 'a'}.png"))
 
 
